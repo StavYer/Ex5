@@ -225,61 +225,66 @@ function createBasketballHoop(xPosition, facingRight) {
 }
 
 function createBasketball() {
-  // Official diameter ≈0.24 m → radius = 0.12
-  const ballRadius    = 0.12;
-  const seamThickness = 0.005;     // how “fat” the seam tubes are
-  const radialSegs    = 16;        // cross-section detail
-  const tubularSegs   = 100;       // ring detail
+  // Core parameters
+  const R             = 0.12;    // ball radius ≈0.12 m
+  const courtHalfTh   = 0.1;     // your court is 0.2 m thick
+  const centerY       = R + courtHalfTh;
+  const seamThick     = 0.005;   // tube radius for seams
+  const radialSegs    = 16;
+  const tubularSegs   = 100;
 
-  // 1) orange sphere
-  const ballGeo = new THREE.SphereGeometry(ballRadius, 64, 64);
-  const ballMat = new THREE.MeshPhongMaterial({
-    color:    0xff6600,
+  // 1) Orange sphere
+  const sphereGeo = new THREE.SphereGeometry(R, 64, 64);
+  const sphereMat = new THREE.MeshPhongMaterial({
+    color:     0xff6600,
     shininess: 50,
     specular:  0x222222
   });
-  const ball = new THREE.Mesh(ballGeo, ballMat);
-  // raise it so it sits on the court (court height = 0.2)
-  ball.position.set(0, ballRadius + 0.1, 0);
+  const ball = new THREE.Mesh(sphereGeo, sphereMat);
+  ball.position.set(0, centerY, 0);
   ball.castShadow = true;
   scene.add(ball);
 
-  // seam material
+  // 2) Seam material
   const seamMat = new THREE.MeshPhongMaterial({
-    color:     0x000000,
+    color:     0x3f1c02,
     shininess: 10,
     specular:  0x111111
   });
 
-  // helper to build a torus-seam of radius=ballRadius
-  function addSeam(rotationX = 0, rotationY = 0, rotationZ = 0) {
-    const torGeo = new THREE.TorusGeometry(
-      ballRadius,      // ring radius
-      seamThickness,   // tube radius
-      radialSegs,
-      tubularSegs
-    );
-    const tor = new THREE.Mesh(torGeo, seamMat);
-    tor.rotation.x = rotationX;
-    tor.rotation.y = rotationY;
-    tor.rotation.z = rotationZ;
-    tor.position.y = ballRadius + 0.1;
-    tor.castShadow = true;
-    scene.add(tor);
+  // 3) Draw the equator as a torus in the XZ-plane
+  {
+    const eqGeo = new THREE.TorusGeometry(R, seamThick, radialSegs, tubularSegs);
+    const eq    = new THREE.Mesh(eqGeo, seamMat);
+    eq.rotation.x = Math.PI/2;       // puts the ring flat in XZ
+    eq.position.y = centerY;
+    eq.castShadow = true;
+    scene.add(eq);
   }
 
-  // 2) equator seam (ring axis = Y)
-  //    default torus lies in XY-plane (axis=Z), so rotate X→align to Y
-  addSeam(Math.PI / 2, 0, 0);
+  // 4) Helper to draw a meridian via TubeGeometry along a parametric path
+  function addMeridian(phi) {
+    class MeridianCurve extends THREE.Curve {
+      constructor() { super(); this.phi = phi; }
+      getPoint(t) {
+        // t from 0→1 maps to θ from 0→2π
+        const θ = t * Math.PI * 2;
+        return new THREE.Vector3(
+          Math.cos(this.phi) * R * Math.cos(θ),
+          centerY + R * Math.sin(θ),
+          Math.sin(this.phi) * R * Math.cos(θ)
+        );
+      }
+    }
+    const curve    = new MeridianCurve();
+    const tubeGeo  = new THREE.TubeGeometry(curve, 200, seamThick, radialSegs, true);
+    const tubeMesh = new THREE.Mesh(tubeGeo, seamMat);
+    tubeMesh.castShadow = true;
+    scene.add(tubeMesh);
+  }
 
-  // 3) first meridian (ring axis = X)
-  //    rotate X by 90° then Z by 90° → axis rotates Z→X
-  addSeam(Math.PI / 2, 0, Math.PI / 2);
-
-  // 4) second meridian (ring axis = Z)
-  //    rotate X by 90°, then Y by 90° → axis rotates Z→Y back
-  //    this one gives you the “cross” cut orthogonal to the equator
-  addSeam(Math.PI / 2, Math.PI / 2, 0);
+  // 5) Four meridians at 0°, 45°, 90°, 135°
+  [0, Math.PI/4, Math.PI/2, 3*Math.PI/4].forEach(phi => addMeridian(phi));
 
   return ball;
 }
