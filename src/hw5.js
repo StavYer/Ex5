@@ -224,6 +224,66 @@ function createBasketballHoop(xPosition, facingRight) {
     scene.add(arm);
 }
 
+function createBasketball() {
+  // Official diameter ≈0.24 m → radius = 0.12
+  const ballRadius    = 0.12;
+  const seamThickness = 0.005;     // how “fat” the seam tubes are
+  const radialSegs    = 16;        // cross-section detail
+  const tubularSegs   = 100;       // ring detail
+
+  // 1) orange sphere
+  const ballGeo = new THREE.SphereGeometry(ballRadius, 64, 64);
+  const ballMat = new THREE.MeshPhongMaterial({
+    color:    0xff6600,
+    shininess: 50,
+    specular:  0x222222
+  });
+  const ball = new THREE.Mesh(ballGeo, ballMat);
+  // raise it so it sits on the court (court height = 0.2)
+  ball.position.set(0, ballRadius + 0.1, 0);
+  ball.castShadow = true;
+  scene.add(ball);
+
+  // seam material
+  const seamMat = new THREE.MeshPhongMaterial({
+    color:     0x000000,
+    shininess: 10,
+    specular:  0x111111
+  });
+
+  // helper to build a torus-seam of radius=ballRadius
+  function addSeam(rotationX = 0, rotationY = 0, rotationZ = 0) {
+    const torGeo = new THREE.TorusGeometry(
+      ballRadius,      // ring radius
+      seamThickness,   // tube radius
+      radialSegs,
+      tubularSegs
+    );
+    const tor = new THREE.Mesh(torGeo, seamMat);
+    tor.rotation.x = rotationX;
+    tor.rotation.y = rotationY;
+    tor.rotation.z = rotationZ;
+    tor.position.y = ballRadius + 0.1;
+    tor.castShadow = true;
+    scene.add(tor);
+  }
+
+  // 2) equator seam (ring axis = Y)
+  //    default torus lies in XY-plane (axis=Z), so rotate X→align to Y
+  addSeam(Math.PI / 2, 0, 0);
+
+  // 3) first meridian (ring axis = X)
+  //    rotate X by 90° then Z by 90° → axis rotates Z→X
+  addSeam(Math.PI / 2, 0, Math.PI / 2);
+
+  // 4) second meridian (ring axis = Z)
+  //    rotate X by 90°, then Y by 90° → axis rotates Z→Y back
+  //    this one gives you the “cross” cut orthogonal to the equator
+  addSeam(Math.PI / 2, Math.PI / 2, 0);
+
+  return ball;
+}
+
 // Create basketball court
 function createBasketballCourt() {
   // Court floor - just a simple brown surface
@@ -238,6 +298,8 @@ function createBasketballCourt() {
   createCourtMrkings();
   createBasketballHoop(-14, true);  // Left hoop (facing right toward center)
   createBasketballHoop(14, false);  // Right hoop (facing left toward center)
+  const basketball = createBasketball();
+
 
   
   // Note: All court lines, hoops, and other elements have been removed
