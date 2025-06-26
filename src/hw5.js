@@ -198,25 +198,28 @@ function createBasketballHoop(xPosition, facingRight) {
     }
 
     // Support structure - pole and arm
-    // Pole extends from bottom of court to above backboard
+    // Pole extends from bottom of court to above backboard, positioned behind court
     const courtBottom = -0.1; // Bottom of the court
     const poleTop = 5.1; // Above the backboard
     const poleHeight = poleTop - courtBottom; // Total height
-    const poleGeometry = new THREE.CylinderGeometry(0.15, 0.15, poleHeight);
+    const poleRadius = 0.15;
+    const poleGeometry = new THREE.CylinderGeometry(poleRadius, poleRadius, poleHeight);
     const poleMaterial = new THREE.MeshPhongMaterial({ color: 0x333333 });
     const pole = new THREE.Mesh(poleGeometry, poleMaterial);
-    const poleOffset = facingRight ? -1.5 : 1.5;
-    pole.position.set(xPosition + poleOffset, (courtBottom + poleTop) / 2, 0); // Center the pole
+    
+    // Position pole behind court with front face tangent to court edge
+    const poleX = facingRight ? -15 - poleRadius : 15 + poleRadius;
+    pole.position.set(poleX, (courtBottom + poleTop) / 2, 0); // Center the pole vertically
     pole.castShadow = true;
     scene.add(pole);
 
     // Support arm connecting pole to backboard
-    const armLength = Math.abs(poleOffset);
+    const armLength = Math.abs(poleX - xPosition);
     const armGeometry = new THREE.BoxGeometry(armLength, 0.1, 0.1);
     const armMaterial = new THREE.MeshPhongMaterial({ color: 0x333333 });
     const arm = new THREE.Mesh(armGeometry, armMaterial);
     // Position arm to connect pole center to backboard
-    arm.position.set(xPosition + poleOffset/2, 4.5, 0); // Same height as backboard
+    arm.position.set((poleX + xPosition) / 2, 4.5, 0); // Centered between pole and backboard
     arm.castShadow = true;
     scene.add(arm);
 }
