@@ -16,5 +16,13 @@
 - Itay Cohen
 
 ## Technical Details
+- If Node.js isn't install install it and run `npm init -y` in terminal
+- Also run in terminal `npm install vite`
 - Run the server with: `node index.js`
 - Access at http://localhost:8000 in your web browser
+
+## Additional Features Implemented
+- None
+
+## Known Issues or Limitations
+- None
