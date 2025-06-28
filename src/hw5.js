@@ -324,19 +324,45 @@ const controls = new OrbitControls(camera, renderer.domElement);
 let isOrbitEnabled = true;
 
 // Instructions display
-const instructionsElement = document.createElement('div');
-instructionsElement.style.position = 'absolute';
-instructionsElement.style.bottom = '20px';
-instructionsElement.style.left = '20px';
-instructionsElement.style.color = 'white';
-instructionsElement.style.fontSize = '16px';
-instructionsElement.style.fontFamily = 'Arial, sans-serif';
-instructionsElement.style.textAlign = 'left';
-instructionsElement.innerHTML = `
-  <h3>Controls:</h3>
-  <p>O - Toggle orbit camera</p>
+const uiStyle = document.createElement('style');
+uiStyle.textContent = `
+  .ui-panel {
+    position: absolute;
+    background: rgba(0,0,0,0.6);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-family: Arial, sans-serif;
+    z-index: 10;
+  }
+  #score-board {
+    top: 20px;
+    left: 20px;
+  }
+  #controls-panel {
+    bottom: 20px;
+    left: 20px;
+  }
 `;
-document.body.appendChild(instructionsElement);
+document.head.appendChild(uiStyle);
+
+// 2) Create your score display panel
+const scoreBoard = document.createElement('div');
+scoreBoard.id = 'score-board';
+scoreBoard.className = 'ui-panel';
+scoreBoard.innerHTML = `Score: <span id="score-value">0</span>`;
+document.body.appendChild(scoreBoard);
+
+// 3) Re-use your existing instructions element as the controls panel
+const controlsPanel = document.createElement('div');
+controlsPanel.id = 'controls-panel';
+controlsPanel.className = 'ui-panel';
+controlsPanel.innerHTML = `
+  <h3>Controls</h3>
+  <p>O — Toggle Orbit Camera</p>
+  <!-- add more as you implement them -->
+`;
+document.body.appendChild(controlsPanel);
 
 // Handle key events
 function handleKeyDown(e) {
