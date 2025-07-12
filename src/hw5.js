@@ -21,6 +21,25 @@ scene.add(directionalLight);
 renderer.shadowMap.enabled = true;
 directionalLight.castShadow = true;
 
+// Basketball tracking variables
+let basketball = null;
+let basketballPosition = new THREE.Vector3(0, 0.22, 0); // Initial position (0.12 radius + 0.1 court half thickness)
+const moveSpeed = 0.1;
+const courtBounds = {
+    xMin: -14.5,
+    xMax: 14.5,
+    zMin: -7,
+    zMax: 7
+};
+
+// Key state tracking
+const keys = {
+    ArrowLeft: false,
+    ArrowRight: false,
+    ArrowUp: false,
+    ArrowDown: false
+};
+
 function degrees_to_radians(degrees) {
   var pi = Math.PI;
   return degrees * (pi/180);
@@ -225,90 +244,116 @@ function createBasketballHoop(xPosition, facingRight) {
 }
 
 function createBasketball() {
-  // Core parameters
-  const R             = 0.12;    // ball radius ≈0.12 m
-  const courtHalfTh   = 0.1;     // your court is 0.2 m thick
-  const centerY       = R + courtHalfTh;
-  const seamThick     = 0.005;   // tube radius for seams
-  const radialSegs    = 16;
-  const tubularSegs   = 100;
+    // Core parameters
+    const R = 0.12;    // ball radius ≈0.12 m
+    const courtHalfTh = 0.1;     // your court is 0.2 m thick
+    const centerY = R + courtHalfTh;
+    const seamThick = 0.005;   // tube radius for seams
+    const radialSegs = 16;
+    const tubularSegs = 100;
 
-  // 1) Orange sphere
-  const sphereGeo = new THREE.SphereGeometry(R, 64, 64);
-  const sphereMat = new THREE.MeshPhongMaterial({
-    color:     0xff6600,
-    shininess: 50,
-    specular:  0x222222
-  });
-  const ball = new THREE.Mesh(sphereGeo, sphereMat);
-  ball.position.set(0, centerY, 0);
-  ball.castShadow = true;
-  scene.add(ball);
+    // 1) Orange sphere
+    const sphereGeo = new THREE.SphereGeometry(R, 64, 64);
+    const sphereMat = new THREE.MeshPhongMaterial({
+        color: 0xff6600,
+        shininess: 50,
+        specular: 0x222222
+    });
+    const ball = new THREE.Mesh(sphereGeo, sphereMat);
+    ball.position.copy(basketballPosition); // Use our position vector
+    ball.castShadow = true;
+    scene.add(ball);
 
-  // 2) Seam material
-  const seamMat = new THREE.MeshPhongMaterial({
-    color:     0x3f1c02,
-    shininess: 10,
-    specular:  0x111111
-  });
+    // 2) Seam material
+    const seamMat = new THREE.MeshPhongMaterial({
+        color: 0x3f1c02,
+        shininess: 10,
+        specular: 0x111111
+    });
 
-  // 3) Draw the equator as a torus in the XZ-plane
-  {
+    // 3) Create a group for the seams that will be children of the ball
+    const seamsGroup = new THREE.Group();
+    ball.add(seamsGroup);
+
+    // 4) Draw the equator as a torus
     const eqGeo = new THREE.TorusGeometry(R, seamThick, radialSegs, tubularSegs);
-    const eq    = new THREE.Mesh(eqGeo, seamMat);
-    eq.rotation.x = Math.PI/2;       // puts the ring flat in XZ
-    eq.position.y = centerY;
+    const eq = new THREE.Mesh(eqGeo, seamMat);
+    eq.rotation.x = Math.PI/2;
     eq.castShadow = true;
-    scene.add(eq);
-  }
+    seamsGroup.add(eq);
 
-  // 4) Helper to draw a meridian via TubeGeometry along a parametric path
-  function addMeridian(phi) {
-    class MeridianCurve extends THREE.Curve {
-      constructor() { super(); this.phi = phi; }
-      getPoint(t) {
-        // t from 0→1 maps to θ from 0→2π
-        const θ = t * Math.PI * 2;
-        return new THREE.Vector3(
-          Math.cos(this.phi) * R * Math.cos(θ),
-          centerY + R * Math.sin(θ),
-          Math.sin(this.phi) * R * Math.cos(θ)
-        );
-      }
+    // 5) Helper to draw a meridian
+    function addMeridian(phi) {
+        class MeridianCurve extends THREE.Curve {
+            constructor() { super(); this.phi = phi; }
+            getPoint(t) {
+                const θ = t * Math.PI * 2;
+                return new THREE.Vector3(
+                    Math.cos(this.phi) * R * Math.cos(θ),
+                    R * Math.sin(θ),
+                    Math.sin(this.phi) * R * Math.cos(θ)
+                );
+            }
+        }
+        const curve = new MeridianCurve();
+        const tubeGeo = new THREE.TubeGeometry(curve, 200, seamThick, radialSegs, true);
+        const tubeMesh = new THREE.Mesh(tubeGeo, seamMat);
+        tubeMesh.castShadow = true;
+        seamsGroup.add(tubeMesh);
     }
-    const curve    = new MeridianCurve();
-    const tubeGeo  = new THREE.TubeGeometry(curve, 200, seamThick, radialSegs, true);
-    const tubeMesh = new THREE.Mesh(tubeGeo, seamMat);
-    tubeMesh.castShadow = true;
-    scene.add(tubeMesh);
-  }
 
-  // 5) Four meridians at 0°, 45°, 90°, 135°
-  [0, Math.PI/4, Math.PI/2, 3*Math.PI/4].forEach(phi => addMeridian(phi));
+    // 6) Four meridians
+    [0, Math.PI/4, Math.PI/2, 3*Math.PI/4].forEach(phi => addMeridian(phi));
 
-  return ball;
+    return ball;
 }
 
 // Create basketball court
 function createBasketballCourt() {
-  // Court floor - just a simple brown surface
-  const courtGeometry = new THREE.BoxGeometry(30, 0.2, 15);
-  const courtMaterial = new THREE.MeshPhongMaterial({ 
-    color: 0xc68642,  // Brown wood color
-    shininess: 50
-  });
-  const court = new THREE.Mesh(courtGeometry, courtMaterial);
-  court.receiveShadow = true;
-  scene.add(court);
-  createCourtMrkings();
-  createBasketballHoop(-14, true);  // Left hoop (facing right toward center)
-  createBasketballHoop(14, false);  // Right hoop (facing left toward center)
-  const basketball = createBasketball();
+    // Court floor - just a simple brown surface
+    const courtGeometry = new THREE.BoxGeometry(30, 0.2, 15);
+    const courtMaterial = new THREE.MeshPhongMaterial({ 
+        color: 0xc68642,  // Brown wood color
+        shininess: 50
+    });
+    const court = new THREE.Mesh(courtGeometry, courtMaterial);
+    court.receiveShadow = true;
+    scene.add(court);
+    createCourtMrkings();
+    createBasketballHoop(-14, true);  // Left hoop (facing right toward center)
+    createBasketballHoop(14, false);  // Right hoop (facing left toward center)
+    
+    // Store the basketball globally
+    basketball = createBasketball();
+}
 
-
-  
-  // Note: All court lines, hoops, and other elements have been removed
-  // Students will need to implement these features
+// Update movement function
+function updateMovement() {
+    if (!basketball) return;
+    
+    // Calculate movement based on keys pressed
+    let deltaX = 0;
+    let deltaZ = 0;
+    
+    if (keys.ArrowLeft) deltaX -= moveSpeed;
+    if (keys.ArrowRight) deltaX += moveSpeed;
+    if (keys.ArrowUp) deltaZ -= moveSpeed;
+    if (keys.ArrowDown) deltaZ += moveSpeed;
+    
+    // Update position with boundary checking
+    const newX = basketballPosition.x + deltaX;
+    const newZ = basketballPosition.z + deltaZ;
+    
+    // Check boundaries
+    if (newX >= courtBounds.xMin && newX <= courtBounds.xMax) {
+        basketballPosition.x = newX;
+    }
+    if (newZ >= courtBounds.zMin && newZ <= courtBounds.zMax) {
+        basketballPosition.z = newZ;
+    }
+    
+    // Update basketball position
+    basketball.position.copy(basketballPosition);
 }
 
 // Create all elements
@@ -359,29 +404,49 @@ controlsPanel.id = 'controls-panel';
 controlsPanel.className = 'ui-panel';
 controlsPanel.innerHTML = `
   <h3>Controls</h3>
+  <p>Arrow Keys — Move Basketball</p>
   <p>O — Toggle Orbit Camera</p>
-  <!-- add more as you implement them -->
 `;
 document.body.appendChild(controlsPanel);
 
 // Handle key events
 function handleKeyDown(e) {
-  if (e.key === "o") {
-    isOrbitEnabled = !isOrbitEnabled;
-  }
+    // Handle movement keys
+    if (e.key in keys) {
+        keys[e.key] = true;
+        e.preventDefault(); // Prevent arrow keys from scrolling the page
+    }
+    
+    // Handle other controls
+    if (e.key === "o") {
+        isOrbitEnabled = !isOrbitEnabled;
+    }
 }
 
+// Add keyup handler
+function handleKeyUp(e) {
+    if (e.key in keys) {
+        keys[e.key] = false;
+        e.preventDefault();
+    }
+}
+
+// Update event listeners
 document.addEventListener('keydown', handleKeyDown);
+document.addEventListener('keyup', handleKeyUp);
 
 // Animation function
 function animate() {
-  requestAnimationFrame(animate);
-  
-  // Update controls
-  controls.enabled = isOrbitEnabled;
-  controls.update();
-  
-  renderer.render(scene, camera);
+    requestAnimationFrame(animate);
+    
+    // Update basketball movement
+    updateMovement();
+    
+    // Update controls
+    controls.enabled = isOrbitEnabled;
+    controls.update();
+    
+    renderer.render(scene, camera);
 }
 
 animate();
