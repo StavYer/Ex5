@@ -32,12 +32,18 @@ const courtBounds = {
     zMax: 7
 };
 
+// Shot power system
+let shotPower = 50; // Default 50%
+const powerChangeSpeed = 2; // How fast power changes per frame
+
 // Key state tracking
 const keys = {
     ArrowLeft: false,
     ArrowRight: false,
     ArrowUp: false,
-    ArrowDown: false
+    ArrowDown: false,
+    w: false,
+    s: false
 };
 
 function degrees_to_radians(degrees) {
@@ -356,6 +362,26 @@ function updateMovement() {
     basketball.position.copy(basketballPosition);
 }
 
+// Update shot power function
+function updatePower() {
+    let powerChanged = false;
+    
+    if (keys.w && shotPower < 100) {
+        shotPower = Math.min(100, shotPower + powerChangeSpeed);
+        powerChanged = true;
+    }
+    if (keys.s && shotPower > 0) {
+        shotPower = Math.max(0, shotPower - powerChangeSpeed);
+        powerChanged = true;
+    }
+    
+    if (powerChanged) {
+        // Update UI
+        document.getElementById('power-value').textContent = Math.round(shotPower) + '%';
+        document.getElementById('power-fill').style.width = shotPower + '%';
+    }
+}
+
 // Create all elements
 createBasketballCourt();
 
@@ -388,6 +414,33 @@ uiStyle.textContent = `
     bottom: 20px;
     left: 20px;
   }
+  #power-indicator {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(0,0,0,0.6);
+    color: white;
+    padding: 10px 15px;
+    border-radius: 4px;
+    font-family: Arial, sans-serif;
+    z-index: 10;
+    min-width: 150px;
+  }
+  #power-bar {
+    width: 100%;
+    height: 20px;
+    background: #333;
+    border: 2px solid #555;
+    border-radius: 10px;
+    margin-top: 5px;
+    overflow: hidden;
+  }
+  #power-fill {
+    height: 100%;
+    background: linear-gradient(to right, #00ff00, #ffff00, #ff0000);
+    width: 50%;
+    transition: width 0.1s;
+  }
 `;
 document.head.appendChild(uiStyle);
 
@@ -398,13 +451,25 @@ scoreBoard.className = 'ui-panel';
 scoreBoard.innerHTML = `Score: <span id="score-value">0</span>`;
 document.body.appendChild(scoreBoard);
 
-// 3) Re-use your existing instructions element as the controls panel
+// 3) Create power indicator
+const powerIndicator = document.createElement('div');
+powerIndicator.id = 'power-indicator';
+powerIndicator.innerHTML = `
+  <div>Shot Power: <span id="power-value">50%</span></div>
+  <div id="power-bar">
+    <div id="power-fill"></div>
+  </div>
+`;
+document.body.appendChild(powerIndicator);
+
+// 4) Re-use your existing instructions element as the controls panel
 const controlsPanel = document.createElement('div');
 controlsPanel.id = 'controls-panel';
 controlsPanel.className = 'ui-panel';
 controlsPanel.innerHTML = `
   <h3>Controls</h3>
   <p>Arrow Keys — Move Basketball</p>
+  <p>W/S — Adjust Shot Power</p>
   <p>O — Toggle Orbit Camera</p>
 `;
 document.body.appendChild(controlsPanel);
@@ -418,7 +483,7 @@ function handleKeyDown(e) {
     }
     
     // Handle other controls
-    if (e.key === "o") {
+    if (e.key.toLowerCase() === "o") {
         isOrbitEnabled = !isOrbitEnabled;
     }
 }
@@ -441,6 +506,9 @@ function animate() {
     
     // Update basketball movement
     updateMovement();
+    
+    // Update shot power
+    updatePower();
     
     // Update controls
     controls.enabled = isOrbitEnabled;
