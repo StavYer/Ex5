@@ -32,6 +32,16 @@ const courtBounds = {
     zMax: 7
 };
 
+// Physics variables
+let basketballVelocity = new THREE.Vector3(0, 0, 0);
+let isShot = false;
+const gravity = -9.8; // m/s^2
+const ballRadius = 0.12;
+
+// Hoop positions for targeting
+const leftHoopPosition = new THREE.Vector3(-14.55, 4.05, 0); // -14 + 0.55 offset
+const rightHoopPosition = new THREE.Vector3(14.55, 4.05, 0); // 14 + 0.55 offset
+
 // Shot power system
 let shotPower = 50; // Default 50%
 const powerChangeSpeed = 2; // How fast power changes per frame
@@ -43,7 +53,8 @@ const keys = {
     ArrowUp: false,
     ArrowDown: false,
     w: false,
-    s: false
+    s: false,
+    ' ': false
 };
 
 function degrees_to_radians(degrees) {
@@ -335,7 +346,7 @@ function createBasketballCourt() {
 
 // Update movement function
 function updateMovement() {
-    if (!basketball) return;
+    if (!basketball || isShot) return;
     
     // Calculate movement based on keys pressed
     let deltaX = 0;
@@ -356,6 +367,70 @@ function updateMovement() {
     }
     if (newZ >= courtBounds.zMin && newZ <= courtBounds.zMax) {
         basketballPosition.z = newZ;
+    }
+    
+    // Update basketball position
+    basketball.position.copy(basketballPosition);
+}
+
+function shootBasketball() {
+    if (isShot) return; // Can't shoot while ball is already in flight
+    
+    isShot = true;
+    
+    // Find nearest hoop
+    const distToLeft = basketballPosition.distanceTo(leftHoopPosition);
+    const distToRight = basketballPosition.distanceTo(rightHoopPosition);
+    const targetHoop = distToLeft < distToRight ? leftHoopPosition : rightHoopPosition;
+    
+    // Calculate direction to hoop
+    const direction = new THREE.Vector3()
+        .subVectors(targetHoop, basketballPosition)
+        .normalize();
+    
+    // Calculate horizontal distance to hoop
+    const horizontalDistance = Math.sqrt(
+        Math.pow(targetHoop.x - basketballPosition.x, 2) + 
+        Math.pow(targetHoop.z - basketballPosition.z, 2)
+    );
+    
+    // Calculate shot power (5-20 range based on power percentage)
+    const power = (shotPower / 100) * 15 + 5;
+    
+    // Calculate initial velocities
+    // For a projectile to reach a target, we need to solve for initial velocity
+    const heightDiff = targetHoop.y - basketballPosition.y;
+    const time = horizontalDistance / (power * 0.7); // Approximate time to reach target
+    
+    // Calculate vertical velocity needed to reach the height
+    // Using: y = v0*t + 0.5*g*t^2
+    const verticalVelocity = (heightDiff - 0.5 * gravity * time * time) / time;
+    
+    // Set velocity components
+    basketballVelocity.set(
+        direction.x * power,
+        verticalVelocity,
+        direction.z * power
+    );
+}
+
+function updatePhysics(deltaTime) {
+    if (!isShot || !basketball) return;
+    
+    // Apply gravity to velocity
+    basketballVelocity.y += gravity * deltaTime;
+    
+    // Update position based on velocity
+    basketballPosition.x += basketballVelocity.x * deltaTime;
+    basketballPosition.y += basketballVelocity.y * deltaTime;
+    basketballPosition.z += basketballVelocity.z * deltaTime;
+    
+    // Check if ball hit the ground
+    if (basketballPosition.y <= ballRadius + 0.1) {
+        basketballPosition.y = ballRadius + 0.1;
+        // For now, just stop the ball when it hits the ground
+        basketballVelocity.set(0, 0, 0);
+        isShot = false;
     }
     
     // Update basketball position
@@ -470,6 +545,7 @@ controlsPanel.innerHTML = `
   <h3>Controls</h3>
   <p>Arrow Keys — Move Basketball</p>
   <p>W/S — Adjust Shot Power</p>
+  <p>Spacebar — Shoot Basketball</p>
   <p>O — Toggle Orbit Camera</p>
 `;
 document.body.appendChild(controlsPanel);
@@ -480,6 +556,11 @@ function handleKeyDown(e) {
     if (e.key in keys) {
         keys[e.key] = true;
         e.preventDefault(); // Prevent arrow keys from scrolling the page
+    }
+    // Handle space key for shooting
+    if (e.key === ' ') {
+        e.preventDefault(); // Prevent page scroll
+        shootBasketball();
     }
     
     // Handle other controls
@@ -501,14 +582,25 @@ document.addEventListener('keydown', handleKeyDown);
 document.addEventListener('keyup', handleKeyUp);
 
 // Animation function
-function animate() {
+let lastTime = 0;
+function animate(currentTime) {
     requestAnimationFrame(animate);
     
-    // Update basketball movement
-    updateMovement();
+    // Calculate delta time in seconds
+    const deltaTime = (currentTime - lastTime) / 1000;
+    lastTime = currentTime;
     
-    // Update shot power
-    updatePower();
+    // Prevent huge delta times on first frame or after tab switch
+    if (deltaTime > 0 && deltaTime < 0.1) {
+        // Update basketball movement
+        updateMovement();
+        
+        // Update shot power
+        updatePower();
+        
+        // Update physics
+        updatePhysics(deltaTime);
+    }
     
     // Update controls
     controls.enabled = isOrbitEnabled;
@@ -517,4 +609,4 @@ function animate() {
     renderer.render(scene, camera);
 }
 
-animate();
+animate(0); // Start with 0 for initial time
