@@ -387,84 +387,61 @@ function resetBall() {
 
 // UPDATED shootBasketball function with proper physics implementation
 function shootBasketball() {
-    // If ball is already shot, reset it instead
-    if (isShot) {
-        resetBall();
-        return;
-    }
-    
-    isShot = true;
-    
-    // Find nearest hoop
-    const distToLeft = basketballPosition.distanceTo(leftHoopPosition);
-    const distToRight = basketballPosition.distanceTo(rightHoopPosition);
-    const targetHoop = distToLeft < distToRight ? leftHoopPosition : rightHoopPosition;
-    
-    // Calculate direction to hoop
-    const direction = new THREE.Vector3()
-        .subVectors(targetHoop, basketballPosition)
-        .normalize();
-    
-    // Calculate horizontal distance to hoop
-    const horizontalDistance = Math.sqrt(
-        Math.pow(targetHoop.x - basketballPosition.x, 2) + 
-        Math.pow(targetHoop.z - basketballPosition.z, 2)
-    );
-    
-    // PHYSICS IMPLEMENTATION REQUIREMENTS ADHERENCE:
-    
-    // 1. Adjustable shot power affecting initial velocity
-    // Power range: at 0% barely moves, at 100% can reach from anywhere
-    const minPower = 1;    // Minimum power for very weak shots
-    const maxPower = 30;   // Maximum power for full-court shots
-    const powerMultiplier = shotPower / 100; // 0 to 1
-    const basePower = minPower + (powerMultiplier * (maxPower - minPower));
-    
-    // 2. Shot angle calculation based on basketball position relative to hoop
-    // Closer shots use higher angles, farther shots use lower angles
-    const distanceFactor = Math.min(horizontalDistance / 20, 1); // Normalize to 0-1
-    // Angle range: 35° to 65° (in radians)
-    const minAngle = 35 * Math.PI / 180; // For far shots
-    const maxAngle = 65 * Math.PI / 180; // For close shots
-    const launchAngle = maxAngle - (distanceFactor * (maxAngle - minAngle));
-    
-    // 3. Initial velocity components based on shot angle and power
-    // Calculate the required initial velocity to reach the target
-    const heightDiff = targetHoop.y - basketballPosition.y;
-    
-    // Using projectile motion equations:
-    // For optimal trajectory considering both distance and height
-    const g = Math.abs(gravity);
-    
-    // Calculate initial velocity magnitude needed
-    // v₀ = √(gR / sin(2θ)) where R is range
-    const sin2Theta = Math.sin(2 * launchAngle);
-    const initialVelocityMagnitude = Math.sqrt((g * horizontalDistance) / sin2Theta);
-    
-    // Apply power scaling
-    const scaledVelocity = initialVelocityMagnitude * (0.5 + 0.5 * powerMultiplier);
-    
-    // 4. Realistic arc height for basketball shots
-    // Add extra velocity for proper arc (minimum arc height to clear rim)
-    const minArcHeight = 0.5; // Minimum height above rim
-    const arcMultiplier = 1.2 + (0.3 * (1 - powerMultiplier)); // More arc for weaker shots
-    
-    // Calculate velocity components
-    const horizontalVelocity = scaledVelocity * Math.cos(launchAngle);
-    const verticalVelocity = scaledVelocity * Math.sin(launchAngle) * arcMultiplier;
-    
-    // Set velocity components
-    basketballVelocity.set(
-        direction.x * horizontalVelocity,
-        verticalVelocity,
-        direction.z * horizontalVelocity
-    );
-    
-    // Special handling for very low power shots (< 20%)
-    if (shotPower < 20) {
-        const weakShotReduction = shotPower / 20; // 0 to 1
-        basketballVelocity.multiplyScalar(0.3 + 0.7 * weakShotReduction);
-    }
+  if (isShot) { resetBall(); return; }
+  isShot = true;
+
+  // 1) Choose target hoop
+  const distToLeft  = basketballPosition.distanceTo(leftHoopPosition);
+  const distToRight = basketballPosition.distanceTo(rightHoopPosition);
+  const targetHoop  = distToLeft < distToRight ? leftHoopPosition : rightHoopPosition;
+
+  // 2) Direction and distances
+  const direction = new THREE.Vector3().subVectors(targetHoop, basketballPosition).normalize();
+  const R  = Math.hypot(targetHoop.x - basketballPosition.x, targetHoop.z - basketballPosition.z);
+  const Δy = targetHoop.y - basketballPosition.y;
+
+  // 3) Compute launch angle based on distance (you already have this)
+  const distanceFactor = Math.min(R/20, 1);
+  const minA = 35 * Math.PI/180, maxA = 65 * Math.PI/180;
+  const θ = maxA - distanceFactor*(maxA - minA);
+
+  // 4) The exact speed v₀ to hit (R, Δy) at angle θ:
+  const g    = Math.abs(gravity);
+  const cosA = Math.cos(θ), sinA = Math.sin(θ);
+  const num  = g * R*R;
+  const den  = 2 * cosA*cosA * (R*Math.tan(θ) - Δy);
+  let v;
+  if (den > 0) {
+    v = Math.sqrt(num/den);
+  } else {
+    // angle too shallow or too high—fallback to a minimal shot
+    v = 2;
+  }
+
+  // 5) Scale by shot power (0–100%)
+  //    At 100% you get the full v₀; at 0% a very weak shot.
+  const powerFrac = shotPower / 100;        // 0 … 1
+  const vLaunch   = v * powerFrac;
+
+  // 6) Split into components
+  const vHoriz = vLaunch * cosA;
+  const vVert  = vLaunch * sinA;
+
+  // 7) (Optional) Enforce a minimum arc height to clear the rim
+  const apexY = basketballPosition.y + (vVert*vVert)/(2*g);
+  const minClear = targetHoop.y + 0.5; // 0.5 m above rim
+  let finalVVert = vVert;
+  if (apexY < minClear) {
+    // boost vertical component so that apexY == minClear
+    finalVVert = Math.sqrt(2 * g * (minClear - basketballPosition.y));
+  }
+
+  // 8) Apply to your velocity vector
+  basketballVelocity.set(
+    direction.x * vHoriz,
+    finalVVert,
+    direction.z * vHoriz
+  );
 }
 
 function updatePhysics(deltaTime) {
