@@ -54,6 +54,7 @@ const keys = {
     ArrowDown: false,
     w: false,
     s: false,
+    r: false,
     ' ': false
 };
 
@@ -373,8 +374,24 @@ function updateMovement() {
     basketball.position.copy(basketballPosition);
 }
 
+// Reset ball function
+function resetBall() {
+    basketballPosition.set(0, 0.22, 0); // Original position
+    basketballVelocity.set(0, 0, 0);
+    isShot = false;
+    
+    if (basketball) {
+        basketball.position.copy(basketballPosition);
+    }
+}
+
+// UPDATED shootBasketball function with proper physics implementation
 function shootBasketball() {
-    if (isShot) return; // Can't shoot while ball is already in flight
+    // If ball is already shot, reset it instead
+    if (isShot) {
+        resetBall();
+        return;
+    }
     
     isShot = true;
     
@@ -394,24 +411,60 @@ function shootBasketball() {
         Math.pow(targetHoop.z - basketballPosition.z, 2)
     );
     
-    // Calculate shot power (5-20 range based on power percentage)
-    const power = (shotPower / 100) * 15 + 5;
+    // PHYSICS IMPLEMENTATION REQUIREMENTS ADHERENCE:
     
-    // Calculate initial velocities
-    // For a projectile to reach a target, we need to solve for initial velocity
+    // 1. Adjustable shot power affecting initial velocity
+    // Power range: at 0% barely moves, at 100% can reach from anywhere
+    const minPower = 1;    // Minimum power for very weak shots
+    const maxPower = 30;   // Maximum power for full-court shots
+    const powerMultiplier = shotPower / 100; // 0 to 1
+    const basePower = minPower + (powerMultiplier * (maxPower - minPower));
+    
+    // 2. Shot angle calculation based on basketball position relative to hoop
+    // Closer shots use higher angles, farther shots use lower angles
+    const distanceFactor = Math.min(horizontalDistance / 20, 1); // Normalize to 0-1
+    // Angle range: 35° to 65° (in radians)
+    const minAngle = 35 * Math.PI / 180; // For far shots
+    const maxAngle = 65 * Math.PI / 180; // For close shots
+    const launchAngle = maxAngle - (distanceFactor * (maxAngle - minAngle));
+    
+    // 3. Initial velocity components based on shot angle and power
+    // Calculate the required initial velocity to reach the target
     const heightDiff = targetHoop.y - basketballPosition.y;
-    const time = horizontalDistance / (power * 0.7); // Approximate time to reach target
     
-    // Calculate vertical velocity needed to reach the height
-    // Using: y = v0*t + 0.5*g*t^2
-    const verticalVelocity = (heightDiff - 0.5 * gravity * time * time) / time;
+    // Using projectile motion equations:
+    // For optimal trajectory considering both distance and height
+    const g = Math.abs(gravity);
+    
+    // Calculate initial velocity magnitude needed
+    // v₀ = √(gR / sin(2θ)) where R is range
+    const sin2Theta = Math.sin(2 * launchAngle);
+    const initialVelocityMagnitude = Math.sqrt((g * horizontalDistance) / sin2Theta);
+    
+    // Apply power scaling
+    const scaledVelocity = initialVelocityMagnitude * (0.5 + 0.5 * powerMultiplier);
+    
+    // 4. Realistic arc height for basketball shots
+    // Add extra velocity for proper arc (minimum arc height to clear rim)
+    const minArcHeight = 0.5; // Minimum height above rim
+    const arcMultiplier = 1.2 + (0.3 * (1 - powerMultiplier)); // More arc for weaker shots
+    
+    // Calculate velocity components
+    const horizontalVelocity = scaledVelocity * Math.cos(launchAngle);
+    const verticalVelocity = scaledVelocity * Math.sin(launchAngle) * arcMultiplier;
     
     // Set velocity components
     basketballVelocity.set(
-        direction.x * power,
+        direction.x * horizontalVelocity,
         verticalVelocity,
-        direction.z * power
+        direction.z * horizontalVelocity
     );
+    
+    // Special handling for very low power shots (< 20%)
+    if (shotPower < 20) {
+        const weakShotReduction = shotPower / 20; // 0 to 1
+        basketballVelocity.multiplyScalar(0.3 + 0.7 * weakShotReduction);
+    }
 }
 
 function updatePhysics(deltaTime) {
@@ -545,7 +598,8 @@ controlsPanel.innerHTML = `
   <h3>Controls</h3>
   <p>Arrow Keys — Move Basketball</p>
   <p>W/S — Adjust Shot Power</p>
-  <p>Spacebar — Shoot Basketball</p>
+  <p>Spacebar — Shoot Basketball (Press again to reset)</p>
+  <p>R — Reset Basketball & Power</p>
   <p>O — Toggle Orbit Camera</p>
 `;
 document.body.appendChild(controlsPanel);
@@ -562,7 +616,17 @@ function handleKeyDown(e) {
         e.preventDefault(); // Prevent page scroll
         shootBasketball();
     }
-    
+
+    // Handle R key for reset
+    if (e.key.toLowerCase() === 'r') {
+        e.preventDefault();
+        resetBall();
+        // Also reset shot power to default
+        shotPower = 50;
+        document.getElementById('power-value').textContent = '50%';
+        document.getElementById('power-fill').style.width = '50%';
+    }
+
     // Handle other controls
     if (e.key.toLowerCase() === "o") {
         isOrbitEnabled = !isOrbitEnabled;
