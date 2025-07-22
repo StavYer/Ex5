@@ -38,6 +38,12 @@ let isShot = false;
 const gravity = -9.8; // m/s^2
 const ballRadius = 0.12;
 
+// Bouncing mechanics
+const coefficientOfRestitution = 0.75; // Energy retained after bounce (0-1)
+const minBounceVelocity = 0.5; // Minimum velocity to keep bouncing
+const rimRadius = 0.45; // From your hoop creation
+const rimTubeRadius = 0.02; // Rim thickness
+
 // Hoop positions for targeting
 const leftHoopPosition = new THREE.Vector3(-14.55, 4.05, 0); // -14 + 0.55 offset
 const rightHoopPosition = new THREE.Vector3(14.55, 4.05, 0); // 14 + 0.55 offset
@@ -454,16 +460,130 @@ function updatePhysics(deltaTime) {
     basketballPosition.y += basketballVelocity.y * deltaTime;
     basketballPosition.z += basketballVelocity.z * deltaTime;
     
-    // Check if ball hit the ground
+    // Ground collision with bouncing
     if (basketballPosition.y <= ballRadius + 0.1) {
         basketballPosition.y = ballRadius + 0.1;
-        // For now, just stop the ball when it hits the ground
-        basketballVelocity.set(0, 0, 0);
-        isShot = false;
+        
+        // Only bounce if velocity is significant
+        if (Math.abs(basketballVelocity.y) > minBounceVelocity) {
+            // Reverse and reduce vertical velocity
+            basketballVelocity.y = -basketballVelocity.y * coefficientOfRestitution;
+            
+            // Apply friction to horizontal movement on bounce
+            basketballVelocity.x *= 0.95;
+            basketballVelocity.z *= 0.95;
+        } else {
+            // Stop bouncing if velocity is too low
+            basketballVelocity.y = 0;
+            
+            // Apply rolling friction
+            basketballVelocity.x *= 0.9;
+            basketballVelocity.z *= 0.9;
+            
+            // Stop completely if moving very slowly
+            const horizontalSpeed = Math.sqrt(basketballVelocity.x**2 + basketballVelocity.z**2);
+            if (horizontalSpeed < 0.1) {
+                basketballVelocity.set(0, 0, 0);
+                isShot = false;
+            }
+        }
     }
+    
+    // Rim collision detection
+    checkRimCollision();
+    // Backboard collision detection
+    checkBackboardCollision();
     
     // Update basketball position
     basketball.position.copy(basketballPosition);
+}
+
+function checkRimCollision() {
+    // Check both hoops
+    const hoops = [
+        { position: leftHoopPosition, offset: 0.55 },
+        { position: rightHoopPosition, offset: -0.55 }
+    ];
+    
+    for (const hoop of hoops) {
+        // Calculate actual rim center
+        const rimCenter = new THREE.Vector3(
+            hoop.position.x + hoop.offset,
+            hoop.position.y,
+            hoop.position.z
+        );
+        
+        // Distance from ball center to rim center in XZ plane
+        const distXZ = Math.sqrt(
+            Math.pow(basketballPosition.x - rimCenter.x, 2) +
+            Math.pow(basketballPosition.z - rimCenter.z, 2)
+        );
+        
+        // Check if ball is at rim height and near the rim
+        const heightDiff = Math.abs(basketballPosition.y - rimCenter.y);
+        
+        if (heightDiff < ballRadius + rimTubeRadius) {
+            // Check if ball hits the rim edge
+            const rimInnerRadius = rimRadius - rimTubeRadius;
+            const rimOuterRadius = rimRadius + rimTubeRadius;
+            
+            if (distXZ > rimInnerRadius - ballRadius && 
+                distXZ < rimOuterRadius + ballRadius) {
+                
+                // Ball hit the rim! Calculate bounce direction
+                const normal = new THREE.Vector3(
+                    basketballPosition.x - rimCenter.x,
+                    0,
+                    basketballPosition.z - rimCenter.z
+                ).normalize();
+                
+                // Reflect velocity off the rim
+                const dot = basketballVelocity.x * normal.x + basketballVelocity.z * normal.z;
+                basketballVelocity.x -= 2 * dot * normal.x * coefficientOfRestitution;
+                basketballVelocity.z -= 2 * dot * normal.z * coefficientOfRestitution;
+                
+                // Reduce vertical velocity slightly
+                basketballVelocity.y *= coefficientOfRestitution;
+                
+                // Push ball away from rim to prevent sticking
+                const pushDistance = (rimOuterRadius + ballRadius) - distXZ + 0.01;
+                basketballPosition.x += normal.x * pushDistance;
+                basketballPosition.z += normal.z * pushDistance;
+            }
+        }
+    }
+}
+
+function checkBackboardCollision() {
+    // Backboard dimensions and positions
+    const backboards = [
+        { x: -14, width: 0.1, height: 1.2, zWidth: 1.8, yCenter: 4.5 },
+        { x: 14, width: 0.1, height: 1.2, zWidth: 1.8, yCenter: 4.5 }
+    ];
+    
+    for (const board of backboards) {
+        // Check if ball is within backboard bounds
+        const halfWidth = board.width / 2;
+        const halfHeight = board.height / 2;
+        const halfZWidth = board.zWidth / 2;
+        
+        if (basketballPosition.x > board.x - halfWidth - ballRadius &&
+            basketballPosition.x < board.x + halfWidth + ballRadius &&
+            basketballPosition.y > board.yCenter - halfHeight - ballRadius &&
+            basketballPosition.y < board.yCenter + halfHeight + ballRadius &&
+            basketballPosition.z > -halfZWidth - ballRadius &&
+            basketballPosition.z < halfZWidth + ballRadius) {
+            
+            // Determine which side of backboard was hit
+            const distFromCenter = basketballPosition.x - board.x;
+            
+            if (Math.abs(distFromCenter) < halfWidth + ballRadius) {
+                // Hit front or back of backboard
+                basketballPosition.x = board.x + Math.sign(distFromCenter) * (halfWidth + ballRadius);
+                basketballVelocity.x = -basketballVelocity.x * coefficientOfRestitution;
+            }
+        }
+    }
 }
 
 // Update shot power function
