@@ -45,8 +45,8 @@ const rimRadius = 0.45; // From your hoop creation
 const rimTubeRadius = 0.02; // Rim thickness
 
 // Hoop positions for targeting
-const leftHoopPosition = new THREE.Vector3(-14.55, 4.05, 0); // -14 + 0.55 offset
-const rightHoopPosition = new THREE.Vector3(14.55, 4.05, 0); // 14 + 0.55 offset
+const leftHoopPosition = new THREE.Vector3(-13.45, 4.05, 0); // -14 + 0.55 offset
+const rightHoopPosition = new THREE.Vector3(13.45, 4.05, 0); // 14 + 0.55 offset
 
 // Shot power system
 let shotPower = 50; // Default 50%
@@ -501,17 +501,13 @@ function updatePhysics(deltaTime) {
 function checkRimCollision() {
     // Check both hoops
     const hoops = [
-        { position: leftHoopPosition, offset: 0.55 },
-        { position: rightHoopPosition, offset: -0.55 }
+        { position: leftHoopPosition },   // Already includes offset
+        { position: rightHoopPosition }   // Already includes offset
     ];
     
     for (const hoop of hoops) {
-        // Calculate actual rim center
-        const rimCenter = new THREE.Vector3(
-            hoop.position.x + hoop.offset,
-            hoop.position.y,
-            hoop.position.z
-        );
+        // The hoop positions already include the offset, so use them directly
+        const rimCenter = hoop.position;
         
         // Distance from ball center to rim center in XZ plane
         const distXZ = Math.sqrt(
@@ -519,10 +515,12 @@ function checkRimCollision() {
             Math.pow(basketballPosition.z - rimCenter.z, 2)
         );
         
-        // Check if ball is at rim height and near the rim
-        const heightDiff = Math.abs(basketballPosition.y - rimCenter.y);
+        // Check if ball is near rim height (more generous range)
+        const heightDiff = basketballPosition.y - rimCenter.y;
         
-        if (heightDiff < ballRadius + rimTubeRadius) {
+        // Check collision when ball is within rim height range
+        if (Math.abs(heightDiff) <= ballRadius + rimTubeRadius) {
+            
             // Check if ball hits the rim edge
             const rimInnerRadius = rimRadius - rimTubeRadius;
             const rimOuterRadius = rimRadius + rimTubeRadius;
@@ -543,12 +541,16 @@ function checkRimCollision() {
                 basketballVelocity.z -= 2 * dot * normal.z * coefficientOfRestitution;
                 
                 // Reduce vertical velocity slightly
-                basketballVelocity.y *= coefficientOfRestitution;
+                basketballVelocity.y *= coefficientOfRestitution * 0.8; // More energy loss on rim hit
                 
                 // Push ball away from rim to prevent sticking
-                const pushDistance = (rimOuterRadius + ballRadius) - distXZ + 0.01;
-                basketballPosition.x += normal.x * pushDistance;
-                basketballPosition.z += normal.z * pushDistance;
+                const pushDistance = (rimOuterRadius + ballRadius) - distXZ + 0.02;
+                if (pushDistance > 0) {
+                    basketballPosition.x += normal.x * pushDistance;
+                    basketballPosition.z += normal.z * pushDistance;
+                }
+                
+ 
             }
         }
     }
