@@ -387,7 +387,6 @@ function resetBall() {
 
 // UPDATED shootBasketball function with proper physics implementation
 function shootBasketball() {
-  if (isShot) { resetBall(); return; }
   isShot = true;
 
   // 1) Choose target hoop
@@ -575,7 +574,7 @@ controlsPanel.innerHTML = `
   <h3>Controls</h3>
   <p>Arrow Keys — Move Basketball</p>
   <p>W/S — Adjust Shot Power</p>
-  <p>Spacebar — Shoot Basketball (Press again to reset)</p>
+  <p>Spacebar — Shoot Basketball</p>
   <p>R — Reset Basketball & Power</p>
   <p>O — Toggle Orbit Camera</p>
 `;
