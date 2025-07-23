@@ -423,22 +423,47 @@ function shootBasketball() {
     v = 2;
   }
 
-  // 5) Scale by shot power (0–100%)
-  //    At 100% you get the full v₀; at 0% a very weak shot.
-  const powerFrac = shotPower / 100;        // 0 … 1
-  const vLaunch   = v * powerFrac;
+  // 5) Scale by shot power with more dramatic effect
+  const powerFrac = shotPower / 100;  // 0 to 1
+
+  // Exponential curve that gives more range
+  // This gives much better differentiation at low powers
+  let powerMultiplier;
+  if (powerFrac === 0) {
+      powerMultiplier = 0;
+  } else {
+      // Use exponential curve: starts very low, ramps up smoothly
+      powerMultiplier = Math.pow(powerFrac, 1.5) * 1.8;
+  }
+
+const vLaunch = v * powerMultiplier;
+
+// Ensure ball doesn't move at all with 0 power
+if (shotPower === 0) {
+    basketballVelocity.set(0, 0, 0);
+    isShot = false;
+    return;
+}
+
+// Ensure ball doesn't move at all with 0 power
+if (shotPower === 0) {
+    basketballVelocity.set(0, 0, 0);
+    isShot = false;
+    return;
+}
 
   // 6) Split into components
   const vHoriz = vLaunch * cosA;
   const vVert  = vLaunch * sinA;
 
   // 7) (Optional) Enforce a minimum arc height to clear the rim
-  const apexY = basketballPosition.y + (vVert*vVert)/(2*g);
-  const minClear = targetHoop.y + 0.5; // 0.5 m above rim
   let finalVVert = vVert;
-  if (apexY < minClear) {
-    // boost vertical component so that apexY == minClear
-    finalVVert = Math.sqrt(2 * g * (minClear - basketballPosition.y));
+  if (powerFrac > 0.1) {  // Only apply arc correction if power > 10%
+      const apexY = basketballPosition.y + (vVert*vVert)/(2*g);
+      const minClear = targetHoop.y + 0.5;
+      if (apexY < minClear) {
+          finalVVert = Math.sqrt(2 * g * (minClear - basketballPosition.y));
+      }
   }
 
   // 8) Apply to your velocity vector
