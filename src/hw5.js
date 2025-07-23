@@ -38,6 +38,10 @@ let isShot = false;
 const gravity = -9.8; // m/s^2
 const ballRadius = 0.12;
 
+// Rotation tracking
+let basketballRotation = new THREE.Euler(0, 0, 0);
+const rotationSpeed = 5; // Radians per meter traveled
+
 // Bouncing mechanics
 const coefficientOfRestitution = 0.75; // Energy retained after bounce (0-1)
 const minBounceVelocity = 0.5; // Minimum velocity to keep bouncing
@@ -376,6 +380,22 @@ function updateMovement() {
         basketballPosition.z = newZ;
     }
     
+    // Add rotation based on movement
+    if (deltaX !== 0 || deltaZ !== 0) {
+        // Calculate rotation amount based on distance moved
+        const distance = Math.sqrt(deltaX * deltaX + deltaZ * deltaZ);
+        const rotationAmount = (distance / ballRadius) * rotationSpeed;
+        
+        // Calculate rotation axis (perpendicular to movement direction)
+        // For a ball rolling on the ground, rotation axis is perpendicular to movement
+        const rotationAxis = new THREE.Vector3(-deltaZ, 0, deltaX).normalize();
+        
+        // Apply rotation using quaternions for smooth rotation
+        const quaternion = new THREE.Quaternion();
+        quaternion.setFromAxisAngle(rotationAxis, rotationAmount);
+        basketball.quaternion.premultiply(quaternion);
+    }
+    
     // Update basketball position
     basketball.position.copy(basketballPosition);
 }
@@ -388,6 +408,7 @@ function resetBall() {
     
     if (basketball) {
         basketball.position.copy(basketballPosition);
+        basketball.quaternion.set(0, 0, 0, 1); // Identity quaternion
     }
 }
 
@@ -484,6 +505,27 @@ function updatePhysics(deltaTime) {
     basketballPosition.x += basketballVelocity.x * deltaTime;
     basketballPosition.y += basketballVelocity.y * deltaTime;
     basketballPosition.z += basketballVelocity.z * deltaTime;
+
+    const horizontalVelocity = new THREE.Vector2(basketballVelocity.x, basketballVelocity.z);
+    const speed = horizontalVelocity.length();
+    
+    if (speed > 0.01) { // Only rotate if moving
+        // Distance traveled this frame
+        const distance = speed * deltaTime;
+        const rotationAmount = (distance / ballRadius) * rotationSpeed;
+        
+        // Rotation axis is perpendicular to horizontal movement
+        const rotationAxis = new THREE.Vector3(
+            -basketballVelocity.z / speed,
+            0,
+            basketballVelocity.x / speed
+        );
+        
+        // Apply rotation
+        const quaternion = new THREE.Quaternion();
+        quaternion.setFromAxisAngle(rotationAxis, rotationAmount);
+        basketball.quaternion.premultiply(quaternion);
+    }
     
     // Ground collision with bouncing
     if (basketballPosition.y <= ballRadius + 0.1) {
@@ -519,6 +561,8 @@ function updatePhysics(deltaTime) {
 
     // Update basketball position
     basketball.position.copy(basketballPosition);
+
+    
 }
 
 function checkRimCollision() {
