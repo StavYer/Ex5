@@ -491,9 +491,7 @@ function updatePhysics(deltaTime) {
     
     // Rim collision detection
     checkRimCollision();
-    // Backboard collision detection
-    checkBackboardCollision();
-    
+
     // Update basketball position
     basketball.position.copy(basketballPosition);
 }
@@ -556,37 +554,6 @@ function checkRimCollision() {
     }
 }
 
-function checkBackboardCollision() {
-    // Backboard dimensions and positions
-    const backboards = [
-        { x: -14, width: 0.1, height: 1.2, zWidth: 1.8, yCenter: 4.5 },
-        { x: 14, width: 0.1, height: 1.2, zWidth: 1.8, yCenter: 4.5 }
-    ];
-    
-    for (const board of backboards) {
-        // Check if ball is within backboard bounds
-        const halfWidth = board.width / 2;
-        const halfHeight = board.height / 2;
-        const halfZWidth = board.zWidth / 2;
-        
-        if (basketballPosition.x > board.x - halfWidth - ballRadius &&
-            basketballPosition.x < board.x + halfWidth + ballRadius &&
-            basketballPosition.y > board.yCenter - halfHeight - ballRadius &&
-            basketballPosition.y < board.yCenter + halfHeight + ballRadius &&
-            basketballPosition.z > -halfZWidth - ballRadius &&
-            basketballPosition.z < halfZWidth + ballRadius) {
-            
-            // Determine which side of backboard was hit
-            const distFromCenter = basketballPosition.x - board.x;
-            
-            if (Math.abs(distFromCenter) < halfWidth + ballRadius) {
-                // Hit front or back of backboard
-                basketballPosition.x = board.x + Math.sign(distFromCenter) * (halfWidth + ballRadius);
-                basketballVelocity.x = -basketballVelocity.x * coefficientOfRestitution;
-            }
-        }
-    }
-}
 
 // Update shot power function
 function updatePower() {
