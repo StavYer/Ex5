@@ -562,6 +562,12 @@ function updatePhysics(deltaTime) {
             // Stop completely if moving very slowly
             const horizontalSpeed = Math.sqrt(basketballVelocity.x**2 + basketballVelocity.z**2);
             if (horizontalSpeed < 0.1) {
+                // Check for missed shot BEFORE setting isShot to false
+                if (isShot && !hasScored) {
+                    showShotFeedback = true;
+                    shotFeedbackMessage = 'MISSED SHOT';
+                    shotFeedbackTimer = 120;
+                }
                 basketballVelocity.set(0, 0, 0);
                 isShot = false;
             }
@@ -576,17 +582,6 @@ function updatePhysics(deltaTime) {
 
     // Check for scoring
     checkScore();
-    
-    // Check if shot is complete (ball stopped or very low)
-    if (isShot && !hasScored && basketballPosition.y <= ballRadius + 0.15) {
-        const horizontalSpeed = Math.sqrt(basketballVelocity.x**2 + basketballVelocity.z**2);
-        if (horizontalSpeed < 0.1) {
-            // Shot missed
-            showShotFeedback = true;
-            shotFeedbackMessage = 'MISSED SHOT';
-            shotFeedbackTimer = 120;
-        }
-    }
     
 }
 
