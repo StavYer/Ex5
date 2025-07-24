@@ -459,12 +459,6 @@ function shootBasketball() {
 
 const vLaunch = v * powerMultiplier;
 
-// Ensure ball doesn't move at all with 0 power
-if (shotPower === 0) {
-    basketballVelocity.set(0, 0, 0);
-    isShot = false;
-    return;
-}
 
 // Ensure ball doesn't move at all with 0 power
 if (shotPower === 0) {
