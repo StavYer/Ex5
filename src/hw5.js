@@ -730,47 +730,121 @@ const uiStyle = document.createElement('style');
 uiStyle.textContent = `
   .ui-panel {
     position: absolute;
-    background: rgba(0,0,0,0.6);
+    background: linear-gradient(135deg, rgba(0,0,0,0.8), rgba(20,20,20,0.7));
     color: white;
-    padding: 8px 12px;
-    border-radius: 4px;
-    font-family: Arial, sans-serif;
+    padding: 15px 20px;
+    border-radius: 8px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     z-index: 10;
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.2);
   }
+  
+  .ui-panel h3 {
+    margin: 0 0 12px 0;
+    font-size: 20px;
+    font-weight: 600;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+  }
+  
   #score-board {
     top: 20px;
     left: 20px;
+    min-width: 180px;
   }
+  
+  #score-board #score-value {
+    color: #4CAF50;
+    font-size: 28px;
+    font-weight: bold;
+  }
+  
+  #score-board div {
+    margin: 5px 0;
+    font-size: 16px;
+  }
+  
+  #score-board span {
+    font-weight: 600;
+    color: #FFC107;
+  }
+  
   #controls-panel {
     bottom: 20px;
     left: 20px;
+    max-width: 250px;
   }
+  
+  #controls-panel p {
+    margin: 8px 0;
+    font-size: 14px;
+    line-height: 1.4;
+    display: flex;
+    align-items: center;
+  }
+  
+  #controls-panel p::before {
+    content: '▸';
+    margin-right: 8px;
+    color: #FF6600;
+  }
+  
   #power-indicator {
     position: absolute;
     top: 20px;
     right: 20px;
-    background: rgba(0,0,0,0.6);
+    background: linear-gradient(135deg, rgba(0,0,0,0.8), rgba(20,20,20,0.7));
     color: white;
-    padding: 10px 15px;
-    border-radius: 4px;
-    font-family: Arial, sans-serif;
+    padding: 15px 20px;
+    border-radius: 8px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     z-index: 10;
-    min-width: 150px;
+    min-width: 200px;
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.2);
   }
+  
+  #power-indicator > div:first-child {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  
+  #power-value {
+    color: #FFC107;
+    font-size: 20px;
+    font-weight: bold;
+  }
+  
   #power-bar {
     width: 100%;
-    height: 20px;
-    background: #333;
-    border: 2px solid #555;
-    border-radius: 10px;
-    margin-top: 5px;
+    height: 24px;
+    background: rgba(255,255,255,0.1);
+    border: 2px solid rgba(255,255,255,0.2);
+    border-radius: 12px;
+    margin-top: 8px;
     overflow: hidden;
+    position: relative;
   }
+  
+  #power-bar::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.1), transparent);
+    border-radius: 10px;
+  }
+  
   #power-fill {
     height: 100%;
-    background: linear-gradient(to right, #00ff00, #ffff00, #ff0000);
+    background: linear-gradient(to right, #4CAF50, #FFC107, #FF5722);
     width: 50%;
-    transition: width 0.1s;
+    transition: width 0.2s ease-out;
+    border-radius: 10px;
+    position: relative;
   }
 `;
 document.head.appendChild(uiStyle);
@@ -805,12 +879,12 @@ const controlsPanel = document.createElement('div');
 controlsPanel.id = 'controls-panel';
 controlsPanel.className = 'ui-panel';
 controlsPanel.innerHTML = `
-  <h3>Controls</h3>
-  <p>Arrow Keys — Move Basketball</p>
-  <p>W/S — Adjust Shot Power</p>
-  <p>Spacebar — Shoot Basketball</p>
-  <p>R — Reset Basketball & Power</p>
-  <p>O — Toggle Orbit Camera</p>
+  <h3 style="margin: 0 0 12px 0; font-size: 20px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">Controls</h3>
+  <p><strong>Arrow Keys</strong> — Move Basketball</p>
+  <p><strong>W/S</strong> — Adjust Shot Power</p>
+  <p><strong>Spacebar</strong> — Shoot Basketball</p>
+  <p><strong>R</strong> — Reset Ball Position</p>
+  <p><strong>O</strong> — Toggle Camera</p>
 `;
 document.body.appendChild(controlsPanel);
 
