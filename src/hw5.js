@@ -921,16 +921,22 @@ function handleKeyDown(e) {
 
     // Handle R key for reset
     if (e.key.toLowerCase() === 'r') {
-        e.preventDefault();
-        resetBall();
-        // Also reset shot power to default
-        shotPower = 50;
-        document.getElementById('power-value').textContent = '50%';
-        document.getElementById('power-fill').style.width = '50%';
-        // Reset shooting state
-        hasScored = false;
-        showShotFeedback = false;
+    e.preventDefault();
+    
+    // Check if we're resetting during an active shot that hasn't scored
+    if (isShot && !hasScored) {
+        // Show missed shot feedback
+        showShotFeedback = true;
+        shotFeedbackMessage = 'MISSED SHOT';
+        shotFeedbackTimer = 120;
     }
+    
+    resetBall();
+    // Also reset shot power to default
+    shotPower = 50;
+    document.getElementById('power-value').textContent = '50%';
+    document.getElementById('power-fill').style.width = '50%';
+}
 
     // Handle other controls
     if (e.key.toLowerCase() === "o") {
