@@ -38,6 +38,18 @@ let isShot = false;
 const gravity = -9.8; // m/s^2
 const ballRadius = 0.12;
 
+// Scoring system variables
+let score = 0;
+let shotAttempts = 0;
+let shotsMade = 0;
+let shootingPercentage = 0;
+let showShotFeedback = false;
+let shotFeedbackMessage = '';
+let shotFeedbackTimer = 0;
+
+// Track if we've already scored this shot
+let hasScored = false;
+
 // Rotation tracking
 let basketballRotation = new THREE.Euler(0, 0, 0);
 const rotationSpeed = 5; // Radians per meter traveled
@@ -414,6 +426,12 @@ function resetBall() {
 
 // UPDATED shootBasketball function with proper physics implementation
 function shootBasketball() {
+  if (!isShot) {  // Only count if not already shooting
+    shotAttempts++;
+    hasScored = false;  // Reset score flag for new shot
+    updateScoreDisplay();
+  }
+
   isShot = true;
 
   // 1) Choose target hoop
@@ -556,6 +574,19 @@ function updatePhysics(deltaTime) {
     // Update basketball position
     basketball.position.copy(basketballPosition);
 
+    // Check for scoring
+    checkScore();
+    
+    // Check if shot is complete (ball stopped or very low)
+    if (isShot && !hasScored && basketballPosition.y <= ballRadius + 0.15) {
+        const horizontalSpeed = Math.sqrt(basketballVelocity.x**2 + basketballVelocity.z**2);
+        if (horizontalSpeed < 0.1) {
+            // Shot missed
+            showShotFeedback = true;
+            shotFeedbackMessage = 'MISSED SHOT';
+            shotFeedbackTimer = 120;
+        }
+    }
     
 }
 
@@ -617,6 +648,55 @@ function checkRimCollision() {
     }
 }
 
+function checkScore() {
+    if (!isShot || hasScored) return;
+    
+    // Check both hoops
+    const hoops = [
+        { position: leftHoopPosition },
+        { position: rightHoopPosition }
+    ];
+    
+    for (const hoop of hoops) {
+        const rimCenter = hoop.position;
+        
+        // Check if ball is passing through hoop
+        const distXZ = Math.sqrt(
+            Math.pow(basketballPosition.x - rimCenter.x, 2) +
+            Math.pow(basketballPosition.z - rimCenter.z, 2)
+        );
+        
+        // Ball must be within rim radius and near hoop height
+        const heightDiff = basketballPosition.y - rimCenter.y;
+        
+        // Check if ball is passing through (slightly below rim and moving down)
+        if (distXZ < rimRadius - ballRadius && // Ball is inside rim
+            heightDiff < 0.1 && heightDiff > -0.3 && // Ball is just below rim
+            basketballVelocity.y < 0) { // Ball is moving downward
+            
+            // Score!
+            score += 2;
+            shotsMade++;
+            hasScored = true;
+            showShotFeedback = true;
+            shotFeedbackMessage = 'SHOT MADE!';
+            shotFeedbackTimer = 120; // 2 seconds at 60fps
+            
+            updateScoreDisplay();
+            break;
+        }
+    }
+}
+
+function updateScoreDisplay() {
+    shootingPercentage = shotAttempts > 0 ? 
+        Math.round((shotsMade / shotAttempts) * 100) : 0;
+    
+    document.getElementById('score-value').textContent = score;
+    document.getElementById('attempts-value').textContent = shotAttempts;
+    document.getElementById('made-value').textContent = shotsMade;
+    document.getElementById('accuracy-value').textContent = shootingPercentage;
+}
 
 // Update shot power function
 function updatePower() {
@@ -704,7 +784,14 @@ document.head.appendChild(uiStyle);
 const scoreBoard = document.createElement('div');
 scoreBoard.id = 'score-board';
 scoreBoard.className = 'ui-panel';
-scoreBoard.innerHTML = `Score: <span id="score-value">0</span>`;
+scoreBoard.innerHTML = `
+  <h3 style="margin: 0 0 10px 0;">Score: <span id="score-value">0</span></h3>
+  <div style="font-size: 14px;">
+    <div>Attempts: <span id="attempts-value">0</span></div>
+    <div>Made: <span id="made-value">0</span></div>
+    <div>Accuracy: <span id="accuracy-value">0</span>%</div>
+  </div>
+`;
 document.body.appendChild(scoreBoard);
 
 // 3) Create power indicator
@@ -732,6 +819,24 @@ controlsPanel.innerHTML = `
 `;
 document.body.appendChild(controlsPanel);
 
+// Shot feedback message
+const shotFeedback = document.createElement('div');
+shotFeedback.id = 'shot-feedback';
+shotFeedback.style.cssText = `
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 48px;
+    font-weight: bold;
+    color: white;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+    display: none;
+    font-family: Arial, sans-serif;
+    pointer-events: none;
+`;
+document.body.appendChild(shotFeedback);
+
 // Handle key events
 function handleKeyDown(e) {
     // Handle movement keys
@@ -753,6 +858,9 @@ function handleKeyDown(e) {
         shotPower = 50;
         document.getElementById('power-value').textContent = '50%';
         document.getElementById('power-fill').style.width = '50%';
+        // Reset shooting state
+        hasScored = false;
+        showShotFeedback = false;
     }
 
     // Handle other controls
@@ -792,6 +900,20 @@ function animate(currentTime) {
         
         // Update physics
         updatePhysics(deltaTime);
+
+        // Update shot feedback
+        if (showShotFeedback && shotFeedbackTimer > 0) {
+            shotFeedbackTimer--;
+            document.getElementById('shot-feedback').style.display = 'block';
+            document.getElementById('shot-feedback').textContent = shotFeedbackMessage;
+            document.getElementById('shot-feedback').style.color = 
+                shotFeedbackMessage === 'SHOT MADE!' ? '#00ff00' : '#ff0000';
+                
+            if (shotFeedbackTimer <= 0) {
+                showShotFeedback = false;
+                document.getElementById('shot-feedback').style.display = 'none';
+            }
+        }
     }
     
     // Update controls
